@@ -21,7 +21,7 @@ namespace FitCompiler
         {
             Console.WriteLine($"\n> FITC v0.77 - Smash 4 Fighter Compiler platform.\n" +
                                "> Licensed under the MIT License\n" +
-                               "> Copyright(c) 2016 Sammi Husky\n");
+                               "> Copyright(c) 2016-2017 Sammi Husky\n");
 
             string mlist = "";
 

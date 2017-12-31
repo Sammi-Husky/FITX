@@ -20,7 +20,7 @@ namespace FITDecompiler
 
             Console.WriteLine($"\n> FITD v0.77 - Smash 4 Fighter Decompiler\n" +
                                "> Licensed under the MIT License\n" +
-                               "> Copyright(c) 2017 Sammi Husky\n");
+                               "> Copyright(c) 2016-2017 Sammi Husky\n");
 
             string target = "";
             string motion = "";
