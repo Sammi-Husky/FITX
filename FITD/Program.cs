@@ -10,7 +10,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Globalization;
 
-namespace FITDecompiler
+namespace FITD
 {
     public class Program
     {
@@ -100,7 +100,7 @@ namespace FITDecompiler
             Console.WriteLine("> S4FC [options] [.mtable file / .mscsb file]");
             Console.WriteLine("> Options:\n" +
                               "> \t-o: Sets the aplication output directory\n" +
-                              "> \t-e: Overrides the internal event dictionary with specified events file" +
+                              "> \t-e: Overrides the internal event dictionary with specified events file\n" +
                               "> \t-m: Sets animation folder for parsing animation names\n" +
                               "> \t-h --help: Displays this help message\n" +
                               "> \t--raw: Also decompile MSC to raw commands in addition to intelligent decompilation");
@@ -119,7 +119,7 @@ namespace FITDecompiler
 
             Dictionary<uint, string> animations = new Dictionary<uint, string>();
             if (!string.IsNullOrEmpty(motionFolder))
-                animations = ParseAnimations(motionFolder);
+                animations = Animations.ParseAnimations(motionFolder);
 
             //string dir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             //if (mtable.Contains(Path.DirectorySeparatorChar))
@@ -144,35 +144,35 @@ namespace FITDecompiler
                         hashes.Add(s.Key);
 
 
-            foreach (uint u in hashes)
+            foreach (uint hash in hashes)
             {
-                string animName = $"0x{u:X8}";
-                if (animations.ContainsKey(u))
-                    animName = animations[u];
+                string animName = $"0x{hash:X8}";
+                if (animations.ContainsKey(hash))
+                    animName = animations[hash];
 
 #if DEBUG
                 Console.WriteLine($">\tDecompiling {animName}..");
 #endif
 
                 ACMDScript game = null, effect = null, sound = null, expression = null;
-                if (files.ContainsKey("game") && files["game"].Scripts.ContainsKey(u))
+                if (files.ContainsKey("game") && files["game"].Scripts.ContainsKey(hash))
                 {
-                    game = (ACMDScript)files["game"].Scripts[u];
+                    game = (ACMDScript)files["game"].Scripts[hash];
                 }
-                if (files.ContainsKey("effect") && files["effect"].Scripts.ContainsKey(u))
+                if (files.ContainsKey("effect") && files["effect"].Scripts.ContainsKey(hash))
                 {
-                    effect = (ACMDScript)files["effect"].Scripts[u];
+                    effect = (ACMDScript)files["effect"].Scripts[hash];
                 }
-                if (files.ContainsKey("sound") && files["sound"].Scripts.ContainsKey(u))
+                if (files.ContainsKey("sound") && files["sound"].Scripts.ContainsKey(hash))
                 {
-                    sound = (ACMDScript)files["sound"].Scripts[u];
+                    sound = (ACMDScript)files["sound"].Scripts[hash];
                 }
-                if (files.ContainsKey("expression") && files["expression"].Scripts.ContainsKey(u))
+                if (files.ContainsKey("expression") && files["expression"].Scripts.ContainsKey(hash))
                 {
-                    expression = (ACMDScript)files["expression"].Scripts[u];
+                    expression = (ACMDScript)files["expression"].Scripts[hash];
                 }
 
-                write_movedef(game, effect, sound, expression, animName, !table.Contains(u), script_dir);
+                write_movedef(game, effect, sound, expression, animName, !table.Contains(hash), script_dir);
             }
             Console.WriteLine(">\tFinished\n");
         }
@@ -208,84 +208,6 @@ namespace FITDecompiler
                     }
                 }
             }
-        }
-        public static Dictionary<uint, string> ParseAnimations(string motionFolder)
-        {
-            var dict = new Dictionary<uint, string>();
-            var files = Directory.EnumerateFiles(motionFolder, "*.*", SearchOption.AllDirectories).
-                Where(x => x.EndsWith(".pac", StringComparison.InvariantCultureIgnoreCase) ||
-                x.EndsWith(".bch", StringComparison.InvariantCultureIgnoreCase)).Select(x => x);
-            foreach (var path in files)
-                ParseAnim(path, ref dict);
-            return dict;
-        }
-
-        public static void ParseAnim(string path, ref Dictionary<uint, string> dict)
-        {
-            if (path.EndsWith(".pac"))
-            {
-                byte[] filebytes = File.ReadAllBytes(path);
-                int count = (int)Util.GetWord(filebytes, 8, Endianness.Big);
-
-                for (int i = 0; i < count; i++)
-                {
-                    uint off = (uint)Util.GetWord(filebytes, 0x10 + (i * 4), Endianness.Big);
-                    string FileName = Util.GetString(filebytes, off, Endianness.Big);
-                    string AnimName = Regex.Match(FileName, @"(.*)([A-Z])([0-9][0-9])(.*)\.omo").Groups[4].ToString();
-                    if (string.IsNullOrEmpty(AnimName))
-                        continue;
-
-                    AddAnimHash(AnimName, ref dict);
-                    AddAnimHash(AnimName + "_C2", ref dict);
-                    AddAnimHash(AnimName + "_C3", ref dict);
-                    AddAnimHash(AnimName + "L", ref dict);
-                    AddAnimHash(AnimName + "R", ref dict);
-
-
-                    if (AnimName.EndsWith("s4s", StringComparison.InvariantCultureIgnoreCase) ||
-                       AnimName.EndsWith("s3s", StringComparison.InvariantCultureIgnoreCase))
-                        AddAnimHash(AnimName.Substring(0, AnimName.Length - 1), ref dict);
-                }
-            }
-            else if (path.EndsWith(".bch"))
-            {
-                using (var stream = File.Open(path, FileMode.Open, FileAccess.Read))
-                using (var reader = new BinaryReader(stream))
-                {
-                    stream.Seek(0xC, SeekOrigin.Begin);
-                    int off = reader.ReadInt32();
-                    stream.Seek(off, SeekOrigin.Begin);
-
-                    while (reader.PeekChar() != '\0')
-                    {
-                        var tmp = reader.ReadStringNT();
-                        string AnimName = Regex.Match(tmp, @"(.*)([A-Z])([0-9][0-9])(.*)").Groups[4].ToString();
-                        if (string.IsNullOrEmpty(AnimName))
-                        {
-                            continue;
-                        }
-
-                        AddAnimHash(AnimName, ref dict);
-                        AddAnimHash(AnimName + "_C2", ref dict);
-                        AddAnimHash(AnimName + "_C3", ref dict);
-                        AddAnimHash(AnimName + "L", ref dict);
-                        AddAnimHash(AnimName + "R", ref dict);
-
-
-                        if (AnimName.EndsWith("s4s", StringComparison.InvariantCultureIgnoreCase) ||
-                           AnimName.EndsWith("s3s", StringComparison.InvariantCultureIgnoreCase))
-                            AddAnimHash(AnimName.Substring(0, AnimName.Length - 1), ref dict);
-                    }
-                }
-            }
-        }
-        public static void AddAnimHash(string name, ref Dictionary<uint, string> dict)
-        {
-            uint crc = Crc32.Compute(name.ToLower());
-            if (dict.ContainsValue(name) || dict.ContainsKey(crc))
-                return;
-
-            dict.Add(crc, name);
         }
 
         private static void write_movedef(ACMDScript game, ACMDScript effect, ACMDScript sound, ACMDScript expression, string animname, bool unlisted, string outdir)
